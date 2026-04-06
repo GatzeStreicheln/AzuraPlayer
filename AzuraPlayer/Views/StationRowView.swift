@@ -5,9 +5,6 @@ struct StationRowView: View {
     let isPlaying: Bool
     let isBuffering: Bool
 
-    @StateObject private var metadata = MetadataService.shared
-    @EnvironmentObject var player: AudioPlayerService
-
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
