@@ -1,17 +1,21 @@
 import Foundation
 import AVFoundation
 import MediaPlayer
+import UIKit
 import Combine
 
 class WatchNowPlayingManager: NSObject, ObservableObject {
     @Published var isPlaying: Bool = false
+    @Published var isStreaming: Bool = false   // true = Audio fliesst wirklich (KVO)
     @Published var currentStation: RadioStation?
     @Published var songTitle: String = ""
     @Published var artistName: String = ""
     @Published var artworkURL: String?
+    @Published var artworkImage: UIImage?
 
     private var player: AVPlayer?
     private var pollTask: Task<Void, Never>?
+    private var statusObserver: NSKeyValueObservation?
     private var sessionActivated = false
 
     override init() {
@@ -22,12 +26,12 @@ class WatchNowPlayingManager: NSObject, ObservableObject {
     }
 
     deinit {
+        statusObserver?.invalidate()
         NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Audio Session
 
-    // Schritt 1: Kategorie einmalig bei init setzen (synchron, OK auf watchOS)
     private func configureAudioCategory() {
         do {
             try AVAudioSession.sharedInstance().setCategory(
@@ -41,8 +45,6 @@ class WatchNowPlayingManager: NSObject, ObservableObject {
         }
     }
 
-    // Schritt 2: Session ASYNCHRON aktivieren (Apple WWDC19-716: Pflicht auf watchOS)
-    // watchOS zeigt bei Bedarf automatisch den Audio-Route-Picker (AirPods etc.)
     private func activateAndPlay(station: RadioStation, url: URL) {
         if sessionActivated {
             startPlayback(station: station, url: url)
@@ -56,7 +58,6 @@ class WatchNowPlayingManager: NSObject, ObservableObject {
                 return
             }
             guard success else { return }
-
             DispatchQueue.main.async {
                 self.sessionActivated = true
                 self.startPlayback(station: station, url: url)
@@ -67,9 +68,16 @@ class WatchNowPlayingManager: NSObject, ObservableObject {
     private func startPlayback(station: RadioStation, url: URL) {
         let item = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: item)
-        player?.automaticallyWaitsToMinimizeStalling = false
-        player?.play()
 
+        // KVO: isStreaming = true sobald Audio wirklich abgespielt wird
+        statusObserver?.invalidate()
+        statusObserver = player?.observe(\.timeControlStatus, options: [.new, .initial]) { [weak self] avPlayer, _ in
+            DispatchQueue.main.async {
+                self?.isStreaming = (avPlayer.timeControlStatus == .playing)
+            }
+        }
+
+        player?.play()
         isPlaying = true
         startPolling(station: station)
         updateNowPlaying()
@@ -91,6 +99,7 @@ class WatchNowPlayingManager: NSObject, ObservableObject {
 
         if type == .began {
             sessionActivated = false
+            isStreaming = false
         } else if type == .ended {
             if let station = currentStation {
                 play(station: station)
@@ -103,30 +112,46 @@ class WatchNowPlayingManager: NSObject, ObservableObject {
     func play(station: RadioStation) {
         guard let url = URL(string: station.streamURL) else { return }
 
+        pollTask?.cancel()
+        statusObserver?.invalidate()
+        statusObserver = nil
         player?.replaceCurrentItem(with: nil)
         player = nil
 
+        isStreaming = false
         currentStation = station
+        songTitle = ""
+        artistName = ""
+        artworkURL = nil
+        artworkImage = nil
         activateAndPlay(station: station, url: url)
     }
 
     func stop() {
+        pollTask?.cancel()
+        statusObserver?.invalidate()
+        statusObserver = nil
         player?.replaceCurrentItem(with: nil)
         player = nil
         isPlaying = false
+        isStreaming = false
         currentStation = nil
         songTitle = ""
         artistName = ""
         artworkURL = nil
-        pollTask?.cancel()
+        artworkImage = nil
         pollTask = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
     func pause() {
+        pollTask?.cancel()
+        statusObserver?.invalidate()
+        statusObserver = nil
         player?.replaceCurrentItem(with: nil)
         player = nil
         isPlaying = false
+        isStreaming = false
         updateNowPlaying()
     }
 
@@ -138,7 +163,7 @@ class WatchNowPlayingManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Remote Controls (AirPods / Kopfhörer / Sperr-Screen)
+    // MARK: - Remote Controls
 
     private func setupRemoteControls() {
         let cc = MPRemoteCommandCenter.shared()
@@ -186,13 +211,37 @@ class WatchNowPlayingManager: NSObject, ObservableObject {
         guard let url = URL(string: station.apiURL) else { return }
         guard let (data, _) = try? await URLSession.shared.data(from: url) else { return }
         guard let response = try? JSONDecoder().decode(NowPlayingResponse.self, from: data) else { return }
+        guard let song = response.nowPlaying?.song else { return }
+
+        // Artwork nur laden wenn URL sich geändert hat UND URL nicht leer ist.
+        // artworkURL wird nur gesetzt wenn Download erfolgreich — so wird bei Fehler
+        // beim nächsten Poll automatisch ein neuer Versuch gestartet.
+        let currentArtURL = await MainActor.run { self.artworkURL }
+        var downloadedImage: UIImage?
+        let newArtURL = song.art.flatMap { $0.isEmpty ? nil : $0 }
+
+        if let artURLString = newArtURL,
+           artURLString != currentArtURL,
+           let artURL = URL(string: artURLString),
+           let (imageData, _) = try? await URLSession.shared.data(from: artURL) {
+            downloadedImage = UIImage(data: imageData)
+        }
 
         await MainActor.run {
-            if let song = response.nowPlaying?.song {
-                self.songTitle = song.title
-                self.artistName = song.artist
-                self.artworkURL = song.art
+            self.songTitle = song.title
+            self.artistName = song.artist
+
+            if let img = downloadedImage {
+                // Download erfolgreich → URL und Image aktualisieren
+                self.artworkURL = newArtURL
+                self.artworkImage = img
+            } else if newArtURL == nil {
+                // Station hat kein Artwork
+                self.artworkURL = nil
+                self.artworkImage = nil
             }
+            // Bei Download-Fehler: artworkURL bleibt alt → nächster Poll versucht es erneut
+
             self.updateNowPlaying()
         }
     }

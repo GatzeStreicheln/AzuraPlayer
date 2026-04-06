@@ -59,12 +59,12 @@ struct StationListView: View {
             ZStack {
                 Circle()
                     .fill(.ultraThinMaterial)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 48, height: 48)
 
                 Circle()
                     .fill(Color.blue.opacity(0.55))
-                    .frame(width: 40, height: 40)
-                    .scaleEffect(pulse ? 1.12 : 1.0)
+                    .frame(width: 48, height: 48)
+                    .scaleEffect(pulse ? 1.10 : 1.0)
                     .animation(
                         player.isPlaying
                             ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
@@ -73,7 +73,7 @@ struct StationListView: View {
                     )
 
                 Image(systemName: player.isPlaying ? "waveform" : "pause.fill")
-                    .font(.footnote.weight(.bold))
+                    .font(.body.weight(.bold))
                     .foregroundStyle(.white)
             }
         }
