@@ -4,12 +4,10 @@ struct NowPlayingView: View {
     @EnvironmentObject var player: WatchNowPlayingManager
     @Environment(\.dismiss) var dismiss
 
-    @State private var crownVolume: Double = 1.0
-
     var body: some View {
         VStack(spacing: 10) {
 
-            // Cover: Song-Art wenn gewünscht, sonst Custom-Bild, sonst Platzhalter
+            // Cover
             Group {
                 if let station = player.currentStation,
                    station.showSongArt,
@@ -38,7 +36,7 @@ struct NowPlayingView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
-            // Titel · Künstler – linksbündig mit Laufschrift wenn zu lang
+            // Titel · Künstler – Laufschrift wenn zu lang, sonst zentriert
             let title = player.songTitle.isEmpty ? "Unbekannt" : player.songTitle
             let artist = player.artistName
             let combined = artist.isEmpty ? title : "\(title) · \(artist)"
@@ -79,23 +77,6 @@ struct NowPlayingView: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 10)
         .navigationTitle("")
-        // Digital Crown → Lautstärke
-        .focusable(true)
-        .digitalCrownRotation(
-            $crownVolume,
-            from: 0.0,
-            through: 1.0,
-            by: 0.05,
-            sensitivity: .medium,
-            isContinuous: false,
-            isHapticFeedbackEnabled: true
-        )
-        .onChange(of: crownVolume) { _, v in
-            player.setVolume(Float(v))
-        }
-        .onAppear {
-            crownVolume = Double(player.currentVolume)
-        }
     }
 
     @ViewBuilder
@@ -133,25 +114,38 @@ private struct MarqueeText: View {
     }
 
     var body: some View {
-        Text(text)
-            .font(font)
-            .lineLimit(1)
-            .fixedSize()
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { w in
-                guard w > 0, w != textWidth else { return }
-                textWidth = w
-                restart()
-            }
-            .offset(x: needsScroll ? offset : 0)
-            .frame(maxWidth: .infinity, alignment: needsScroll ? .leading : .center)
-            .clipped()
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { w in
-                guard w > 0, w != containerWidth else { return }
-                containerWidth = w
-                restart()
-            }
-            .onChange(of: text) { _, _ in restart() }
-            .onDisappear { scrollTask?.cancel() }
+        // Sichtbarer Text im ZStack – Alignment steuert ob zentriert oder links
+        ZStack(alignment: needsScroll ? .leading : .center) {
+            Text(text)
+                .font(font)
+                .lineLimit(1)
+                .fixedSize()
+                .offset(x: needsScroll ? offset : 0)
+        }
+        .frame(maxWidth: .infinity)
+        .clipped()
+        // Containerbreite: direkt am äusseren Frame messen, unabhängig vom Text
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { w in
+            guard w > 0, w != containerWidth else { return }
+            containerWidth = w
+            restart()
+        }
+        // Textbreite: unsichtbare Kopie im Hintergrund – fixedSize() liefert natürliche Breite
+        // unabhängig davon, was der Container vorschlägt
+        .background(alignment: .leading) {
+            Text(text)
+                .font(font)
+                .lineLimit(1)
+                .fixedSize()
+                .hidden()
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { w in
+                    guard w > 0, w != textWidth else { return }
+                    textWidth = w
+                    restart()
+                }
+        }
+        .onChange(of: text) { _, _ in restart() }
+        .onDisappear { scrollTask?.cancel() }
     }
 
     private func restart() {
