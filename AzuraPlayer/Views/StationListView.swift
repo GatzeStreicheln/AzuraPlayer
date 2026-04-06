@@ -28,6 +28,7 @@ struct StationListView: View {
                         } label: {
                             Label("Löschen", systemImage: "trash")
                         }
+                        .tint(.red)
 
                         Button {
                             editingStation = station
@@ -69,8 +70,8 @@ struct StationListView: View {
                     }
                 }
             }
-            .confirmationDialog(
-                "Radiosender löschen?",
+            .alert(
+                "Sender löschen?",
                 isPresented: Binding(
                     get: { stationToDelete != nil },
                     set: { if !$0 { stationToDelete = nil } }
