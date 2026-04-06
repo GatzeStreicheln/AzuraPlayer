@@ -42,8 +42,8 @@ struct StationListView: View {
                         HStack(spacing: 0) {
                             Spacer()
                             floatingButton
-                                .padding(.trailing, 7)
-                                .padding(.bottom, 7)
+                                .padding(.trailing, 14)
+                                .padding(.bottom, 14)
                         }
                     }
                     .ignoresSafeArea()
