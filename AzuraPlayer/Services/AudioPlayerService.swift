@@ -38,7 +38,7 @@ class AudioPlayerService: ObservableObject {
             try AVAudioSession.sharedInstance().setCategory(
                 .playback,
                 mode: .default,
-                options: [.allowAirPlay, .allowBluetooth]
+                options: [.allowAirPlay, .allowBluetoothHFP]
             )
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
