@@ -4,9 +4,8 @@ struct StationRowView: View {
     let station: RadioStation
     @EnvironmentObject var player: WatchNowPlayingManager
 
-    var isPlaying: Bool {
-        player.currentStation?.id == station.id && player.isPlaying
-    }
+    var isCurrent: Bool { player.currentStation?.id == station.id }
+    var isPlaying: Bool { isCurrent && player.isPlaying }
 
     var body: some View {
         Button {
@@ -34,18 +33,23 @@ struct StationRowView: View {
 
                 Text(station.displayName)
                     .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
 
                 Spacer()
 
+                // Spielt → roter Stop   |   Pausiert → gedimmter Pause-Indikator
                 if isPlaying {
                     Image(systemName: "stop.fill")
                         .font(.caption)
                         .foregroundStyle(.red)
+                } else if isCurrent {
+                    Image(systemName: "pause.fill")
+                        .font(.caption)
+                        .foregroundStyle(.blue.opacity(0.7))
                 }
             }
         }
         .buttonStyle(.plain)
     }
 }
-

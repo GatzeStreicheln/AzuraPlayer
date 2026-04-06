@@ -30,8 +30,13 @@ class WatchNowPlayingManager: ObservableObject {
         player?.pause()
         player = nil
         isPlaying = false
+        currentStation = nil
+        songTitle = ""
+        artistName = ""
+        artworkURL = nil
         pollTask?.cancel()
         pollTask = nil
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
     func pause() {

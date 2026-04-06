@@ -14,7 +14,14 @@ struct StationListView: View {
                     StationRowView(station: station)
                 }
             }
-            .navigationTitle("Sender")
+            .navigationTitle("")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text("Sender")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(.white)
+                }
+            }
             .navigationDestination(isPresented: $showNowPlaying) {
                 NowPlayingView()
             }
@@ -27,7 +34,7 @@ struct StationListView: View {
                     )
                 }
             }
-            // Floating Now Playing Button
+            // Floating Now Playing Button – so weit unten wie möglich
             .overlay(alignment: .bottomTrailing) {
                 if player.currentStation != nil {
                     Button {
@@ -55,7 +62,7 @@ struct StationListView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .padding(.bottom, 4)
+                    .padding(.bottom, 0)
                     .padding(.trailing, 4)
                     .onAppear { pulse = player.isPlaying }
                     .onChange(of: player.isPlaying) { _, playing in
