@@ -77,6 +77,9 @@ struct NowPlayingView: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 10)
         .navigationTitle("")
+        // focusable() → watchOS leitet die Krone automatisch ans System-Volume weiter
+        // (setzt voraus dass WKBackgroundModes: audio gesetzt und Audio-Session aktiv ist)
+        .focusable()
     }
 
     @ViewBuilder
