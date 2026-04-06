@@ -2,62 +2,95 @@ import SwiftUI
 
 struct NowPlayingView: View {
     @EnvironmentObject var player: WatchNowPlayingManager
+    @Environment(\.dismiss) var dismiss
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 10) {
-                // Cover
+            VStack(spacing: 8) {
+
+                // Cover (Song-Art wenn verfügbar, sonst Sender-Custom-Image, sonst Platzhalter)
                 Group {
-                    if let data = player.currentStation?.customImageData,
-                       let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
+                    if let urlString = player.artworkURL, let url = URL(string: urlString) {
+                        AsyncImage(url: url) { phase in
+                            if case .success(let img) = phase {
+                                img.resizable().scaledToFill()
+                            } else {
+                                placeholderIcon
+                            }
+                        }
                     } else {
-                        Image(systemName: "radio")
-                            .font(.largeTitle)
-                            .foregroundStyle(.blue)
+                        placeholderIcon
                     }
                 }
-                .frame(width: 60, height: 60)
+                .frame(width: 70, height: 70)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(radius: 4)
 
                 // Sendername
                 Text(player.currentStation?.displayName ?? "")
                     .font(.footnote.weight(.bold))
                     .lineLimit(1)
+                    .foregroundStyle(.primary)
 
-                // Song
-                if !player.songTitle.isEmpty {
-                    Text(player.songTitle)
+                // Titel
+                Text(player.songTitle.isEmpty ? "Titel unbekannt" : player.songTitle)
+                    .font(.caption2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .foregroundStyle(.primary)
+
+                // Künstler
+                if !player.artistName.isEmpty {
+                    Text(player.artistName)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
                 }
 
-                // Steuerung
-                HStack(spacing: 20) {
+                // Steuerung: Pause + Stop
+                HStack(spacing: 16) {
+                    // Pause / Play
                     Button {
-                        if player.isPlaying {
-                            player.stop()
-                        } else if let station = player.currentStation {
-                            player.play(station: station)
-                        }
+                        player.togglePlayPause()
                     } label: {
-                        Image(systemName: player.isPlaying ? "stop.fill" : "play.fill")
-                            .font(.title2)
+                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.title3)
                             .foregroundStyle(.white)
                             .frame(width: 44, height: 44)
-                            .background(player.isPlaying ? Color.red : Color.blue)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    // Stop
+                    Button {
+                        player.stop()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.gray.opacity(0.6))
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
                 }
+                .padding(.top, 4)
             }
-            .padding()
+            .padding(.horizontal, 4)
+            .padding(.bottom, 8)
         }
         .navigationTitle("Now Playing")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var placeholderIcon: some View {
+        ZStack {
+            Color.gray.opacity(0.2)
+            Image(systemName: "music.note.house")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+        }
     }
 }

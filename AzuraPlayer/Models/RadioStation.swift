@@ -22,6 +22,7 @@ struct RadioStation: Identifiable, Codable {
     enum CodingKeys: String, CodingKey {
         case id, customName, streamURL, apiURL
         case customImageData, showSongArt, sortOrder
+        case fetchedStationName, fetchedStationArtURL
     }
 }
 

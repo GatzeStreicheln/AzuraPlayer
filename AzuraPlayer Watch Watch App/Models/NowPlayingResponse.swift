@@ -2,7 +2,7 @@ import Foundation
 
 struct NowPlayingResponse: Codable {
     let station: StationInfo
-    let nowPlaying: NowPlayingTrack
+    let nowPlaying: NowPlayingTrack?
 
     enum CodingKeys: String, CodingKey {
         case station
@@ -15,7 +15,7 @@ struct StationInfo: Codable {
 }
 
 struct NowPlayingTrack: Codable {
-    let song: SongInfo
+    let song: SongInfo?
 }
 
 struct SongInfo: Codable {

@@ -35,7 +35,13 @@ class StationStore: NSObject, ObservableObject, WCSessionDelegate {
 
     func sendToWatch() {
         guard WCSession.default.activationState == .activated else { return }
-        guard let data = try? JSONEncoder().encode(stations) else { return }
+        // customImageData weglassen – updateApplicationContext hat ein 65 KB-Limit
+        let lite = stations.map { s -> RadioStation in
+            var copy = s
+            copy.customImageData = nil
+            return copy
+        }
+        guard let data = try? JSONEncoder().encode(lite) else { return }
         try? WCSession.default.updateApplicationContext(["stations": data])
     }
 
@@ -84,6 +90,7 @@ class StationStore: NSObject, ObservableObject, WCSessionDelegate {
                 await MainActor.run {
                     if let idx = self.stations.firstIndex(where: { $0.id == station.id }) {
                         self.stations[idx].fetchedStationName = response.station.name
+                        self.sendToWatch()
                     }
                 }
             } catch {

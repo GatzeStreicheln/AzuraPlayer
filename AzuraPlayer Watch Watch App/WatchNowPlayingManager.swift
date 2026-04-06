@@ -34,14 +34,20 @@ class WatchNowPlayingManager: ObservableObject {
         pollTask = nil
     }
 
+    func pause() {
+        // Live-Stream: Player zerstören, kein Hintergrund-Buffering
+        player?.pause()
+        player = nil
+        pollTask?.cancel()
+        pollTask = nil
+        isPlaying = false
+    }
+
     func togglePlayPause() {
-        guard let player = player else { return }
         if isPlaying {
-            player.pause()
-            isPlaying = false
-        } else {
-            player.play()
-            isPlaying = true
+            pause()
+        } else if let station = currentStation {
+            play(station: station)
         }
     }
 
@@ -63,9 +69,11 @@ class WatchNowPlayingManager: ObservableObject {
         guard let response = try? JSONDecoder().decode(NowPlayingResponse.self, from: data) else { return }
 
         await MainActor.run {
-            self.songTitle = response.nowPlaying.song.title
-            self.artistName = response.nowPlaying.song.artist
-            self.artworkURL = response.nowPlaying.song.art
+            if let song = response.nowPlaying?.song {
+                self.songTitle = song.title
+                self.artistName = song.artist
+                self.artworkURL = song.art
+            }
             self.updateNowPlaying()
         }
     }
