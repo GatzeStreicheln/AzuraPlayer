@@ -1,8 +1,3 @@
-//
-//  NowPlayingResponse.swift
-//  AzuraPlayer
-//
-
 import Foundation
 
 struct NowPlayingResponse: Codable {
@@ -44,7 +39,6 @@ struct SongInfo: Codable {
     let album: String?
 }
 
-// LiveInfo ist nur noch ein einfacher Container. Wenn das JSON kein "live" hat, ist das Ganze hier nil.
 struct LiveInfo: Codable {
     let isLive: Bool
     let streamerName: String?

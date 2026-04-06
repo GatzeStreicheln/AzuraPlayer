@@ -1,24 +1,19 @@
-//
-//  SettingsView.swift
-//  AzuraPlayer
-//
 import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("isDarkModeEnabled") private var isDarkModeEnabled = false
-    
+
     var body: some View {
         NavigationStack {
             List {
                 Section("Erscheinungsbild") {
                     Toggle("Dark Mode aktivieren", isOn: $isDarkModeEnabled)
-                        .toggleStyle(.switch)
-                    
+
                     Text("Wenn aktiviert, wird die App immer im Dunklen Modus angezeigt.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                
+
                 Section("Info") {
                     Text("AzuraPlayer v0.1")
                 }

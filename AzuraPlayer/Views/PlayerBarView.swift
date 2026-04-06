@@ -1,8 +1,3 @@
-//
-//  PlayerBarView.swift
-//  AzuraPlayer
-//
-
 import SwiftUI
 
 struct PlayerBarView: View {

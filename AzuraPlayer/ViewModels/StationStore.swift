@@ -1,9 +1,3 @@
-//
-//  StationStore.swift
-//  AzuraPlayer
-//
-//  Created by Vasco Kugler on 06.04.2026.
-//
 import Foundation
 import SwiftUI
 import Combine
@@ -15,10 +9,7 @@ class StationStore: ObservableObject {
 
     init() {
         load()
-        // Nach dem Laden für alle Stationen Namen holen
-        for station in stations {
-            fetchStationName(for: station)
-        }
+        stations.forEach { fetchStationName(for: $0) }
     }
 
     func add(station: RadioStation) {
@@ -58,7 +49,6 @@ class StationStore: ObservableObject {
                 await MainActor.run {
                     if let idx = self.stations.firstIndex(where: { $0.id == station.id }) {
                         self.stations[idx].fetchedStationName = response.station.name
-                        self.stations[idx].fetchedStationArtURL = nil
                     }
                 }
             } catch {

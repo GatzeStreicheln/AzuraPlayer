@@ -1,15 +1,10 @@
-//
-//  StationListView.swift
-//  AzuraPlayer
-//
-
 import SwiftUI
 
 struct StationListView: View {
     @EnvironmentObject var store: StationStore
     @EnvironmentObject var player: AudioPlayerService
     @Binding var showPlayer: Bool
-    
+
     @State private var showAddStation = false
     @State private var editingStation: RadioStation? = nil
     @State private var stationToDelete: RadioStation? = nil
@@ -33,7 +28,7 @@ struct StationListView: View {
                         } label: {
                             Label("Löschen", systemImage: "trash")
                         }
-                        
+
                         Button {
                             editingStation = station
                         } label: {
@@ -41,7 +36,6 @@ struct StationListView: View {
                         }
                         .tint(.accentColor)
                     }
-                    // Hintergrund der Zeilen: Transparent, damit der Listen-Hintergrund durchscheint
                     .listRowBackground(
                         Color(UIColor.systemBackground)
                             .opacity(0.0)
@@ -50,7 +44,7 @@ struct StationListView: View {
                 .onMove { from, to in
                     store.move(from: from, to: to)
                 }
-                
+
                 VStack {
                     Color.clear
                         .frame(height: 100)
@@ -60,8 +54,6 @@ struct StationListView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            // FIX: Nutzung von systemBackground statt hartem Schwarz
-            // Passt sich automatisch an Light/Dark Mode an
             .background(Color(UIColor.systemBackground).ignoresSafeArea())
             .navigationTitle("AzuraPlayer")
             .toolbar {
@@ -77,12 +69,20 @@ struct StationListView: View {
                     }
                 }
             }
-            .confirmationDialog("Radiosender löschen?", isPresented: .constant(stationToDelete != nil), presenting: stationToDelete) { station in
+            .confirmationDialog(
+                "Radiosender löschen?",
+                isPresented: Binding(
+                    get: { stationToDelete != nil },
+                    set: { if !$0 { stationToDelete = nil } }
+                ),
+                presenting: stationToDelete
+            ) { station in
                 Button("Löschen", role: .destructive) {
                     store.delete(station: station)
                     if player.currentStation?.id == station.id {
                         player.stop()
                     }
+                    stationToDelete = nil
                 }
                 Button("Abbrechen", role: .cancel) {
                     stationToDelete = nil
@@ -97,7 +97,5 @@ struct StationListView: View {
                 AddEditStationView(store: store, editStation: station)
             }
         }
-        // WICHTIG: Kein eigenes preferredColorScheme hier!
-        // Das wird global von ContentView/Settings gesteuert.
     }
 }

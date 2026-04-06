@@ -1,8 +1,3 @@
-//
-//  AudioPlayerService.swift
-//  AzuraPlayer
-//
-
 import AVFoundation
 import MediaPlayer
 import Combine

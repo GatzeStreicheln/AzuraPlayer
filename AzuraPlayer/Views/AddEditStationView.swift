@@ -1,9 +1,3 @@
-//
-//  AddEditStationView.swift
-//  AzuraPlayer
-//
-//  Created by Vasco Kugler on 06.04.2026.
-//
 import SwiftUI
 import PhotosUI
 

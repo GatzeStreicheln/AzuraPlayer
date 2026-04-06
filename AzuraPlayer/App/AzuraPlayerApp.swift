@@ -1,8 +1,3 @@
-//
-//  AzuraPlayerApp.swift
-//  AzuraPlayer
-//
-
 import SwiftUI
 
 @main

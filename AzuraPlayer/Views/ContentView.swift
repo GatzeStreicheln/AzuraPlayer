@@ -1,17 +1,11 @@
-//
-//  ContentView.swift
-//  AzuraPlayer
-//
-
 import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var store: StationStore
     @EnvironmentObject var player: AudioPlayerService
-    
+
     @State private var selectedTab = 0
     @State private var showPlayer = false
-    // Den Status des Dark Modes hier abrufen (gleicher Schlüssel wie in Settings)
     @AppStorage("isDarkModeEnabled") private var isDarkModeEnabled = false
 
     private let accentBlue = Color(red: 0.0, green: 0.48, blue: 1.0)
@@ -23,19 +17,14 @@ struct ContentView: View {
 
             TabView(selection: $selectedTab) {
                 StationListView(showPlayer: $showPlayer)
-                    .tabItem {
-                        Label("Home", systemImage: "house.fill")
-                    }
+                    .tabItem { Label("Home", systemImage: "house.fill") }
                     .tag(0)
-                
+
                 SettingsView()
-                    .tabItem {
-                        Label("Settings", systemImage: "gearshape.fill")
-                    }
+                    .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                     .tag(1)
             }
             .tint(accentBlue)
-            // HIER WIRD DER MODUS GLOBAL FÜR ALLE TABS GESETZT
             .preferredColorScheme(isDarkModeEnabled ? .dark : .light)
 
             if player.currentStation != nil {
