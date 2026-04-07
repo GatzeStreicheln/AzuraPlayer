@@ -40,15 +40,6 @@ struct SettingsView: View {
                     .id(themeColorName)
                 }
 
-                Section(tr("Legal", "Rechtliches", lang)) {
-                    NavigationLink(tr("Privacy Policy", "Datenschutz", lang)) {
-                        LegalTextView(
-                            title: tr("Privacy Policy", "Datenschutz", lang),
-                            content: lang == "de" ? datenschutzTextDE : datenschutzTextEN
-                        )
-                    }
-                }
-
                 Section(tr("Links & Contact", "Links & Kontakt", lang)) {
                     if let url = URL(string: "https://github.com/GatzeStreicheln/AzuraPlayer") {
                         Link(destination: url) {
@@ -56,6 +47,19 @@ struct SettingsView: View {
                                 Image(systemName: "chevron.left.forwardslash.chevron.right")
                                     .foregroundStyle(.secondary)
                                 Text("GitHub")
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if let url = URL(string: "https://gatzestreicheln.github.io/AzuraPlayer/privacy.html") {
+                        Link(destination: url) {
+                            HStack {
+                                Image(systemName: "hand.raised")
+                                    .foregroundStyle(.secondary)
+                                Text(tr("Privacy Policy", "Datenschutz", lang))
                                 Spacer()
                                 Image(systemName: "arrow.up.right")
                                     .font(.caption)
@@ -105,55 +109,4 @@ struct SettingsView: View {
         }
     }
 }
-
-struct LegalTextView: View {
-    let title: String
-    let content: String
-
-    private var attributedContent: AttributedString {
-        let options = AttributedString.MarkdownParsingOptions(
-            interpretedSyntax: .inlineOnlyPreservingWhitespace
-        )
-        return (try? AttributedString(markdown: content, options: options)) ?? AttributedString(content)
-    }
-
-    var body: some View {
-        ScrollView {
-            Text(attributedContent)
-                .font(.body)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-// MARK: - Legal Texts
-
-private let datenschutzTextDE = """
-AzuraPlayer erfasst keine personenbezogenen Daten. Es findet kein Tracking statt, es wird keine Werbung eingeblendet, und es ist kein Benutzerkonto erforderlich.
-
-**Gespeicherte Daten**
-AzuraPlayer speichert die hinzugefügten Stationen ausschließlich lokal auf dem Gerät. Diese Daten verlassen das Gerät nicht und werden nicht übermittelt.
-
-**Verbindung zu externen Servern**
-Wird ein Radiostream abgerufen, verbindet sich die App direkt mit dem AzuraCast-Server der jeweiligen Station. Dabei können dort technische Daten wie die IP-Adresse anfallen. Dies liegt außerhalb des Einflussbereichs von AzuraPlayer und liegt in der Verantwortung des jeweiligen Stationsbetreibers.
-
-**App Store**
-Wird die App über den Apple App Store geladen, gelten zusätzlich die Datenschutzbestimmungen von Apple. Darauf besteht kein Einfluss seitens AzuraPlayer.
-"""
-
-private let datenschutzTextEN = """
-AzuraPlayer does not collect any personal data. There is no tracking, no advertising, and no user account required.
-
-**Stored Data**
-AzuraPlayer stores the stations you add exclusively on your device. This data never leaves your device and is not transmitted anywhere.
-
-**Connection to External Servers**
-When a radio stream is accessed, the app connects directly to the AzuraCast server of the respective station. Technical data such as your IP address may be recorded there. This is outside the control of AzuraPlayer and is the responsibility of the respective station operator.
-
-**App Store**
-If you download the app via the Apple App Store, Apple's privacy policy also applies. AzuraPlayer has no influence over this.
-"""
 
