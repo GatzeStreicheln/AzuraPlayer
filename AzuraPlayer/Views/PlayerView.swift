@@ -1,37 +1,43 @@
 import SwiftUI
+import AVKit
 
 struct PlayerView: View {
     @ObservedObject var player = AudioPlayerService.shared
     @ObservedObject var metadata = MetadataService.shared
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
+    @AppStorage("appLanguage") private var lang = "en"
 
-    private let accentBlue = Color(red: 0.0, green: 0.48, blue: 1.0)
+    @State private var showSleepTimerDialog = false
+
+    @AppStorage("themeColor") private var themeColorName = "blue"
+    private var accentColor: Color { AppTheme.color(for: themeColorName) }
 
     var body: some View {
-        VStack(spacing: 30) {
-            // Griff & Schließen
+        VStack(spacing: 0) {
+            // FIXED TOP — niemals verschoben
             VStack(spacing: 15) {
                 Capsule()
                     .fill(Color.gray.opacity(0.4))
                     .frame(width: 40, height: 5)
-                
+
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(accentColor)
                         .frame(width: 44, height: 44)
                         .background(Color.gray.opacity(colorScheme == .dark ? 0.3 : 0.1))
                         .clipShape(Circle())
                 }
             }
             .padding(.top, 10)
+            .padding(.bottom, 8)
 
-            Spacer().frame(height: 10)
+            // FLEXIBLER BEREICH — nur Cover + Metadata verschieben sich
+            Spacer()
 
-            // Cover
             ZStack {
                 if let station = player.currentStation,
                    station.showSongArt,
@@ -53,19 +59,18 @@ struct PlayerView: View {
                     placeholder
                 }
             }
-            .frame(width: 260, height: 260)
+            .frame(width: 290, height: 290)
             .clipShape(RoundedRectangle(cornerRadius: 24))
             .shadow(color: .black.opacity(0.5), radius: 30, y: 15)
+            .padding(.bottom, 20)
 
-            // Infos
             VStack(spacing: 10) {
                 Text(player.currentStation?.displayName ?? "Radio")
                     .font(.headline)
                     .foregroundStyle(.secondary)
-                
-                // Status Anzeige (Verbinde vs. Live)
+
                 if player.isBuffering {
-                    Label("Verbinde...", systemImage: "wifi.exclamationmark")
+                    Label(tr("Connecting...", "Verbinde...", lang), systemImage: "wifi.exclamationmark")
                         .font(.caption)
                         .foregroundStyle(.orange)
                         .padding(.horizontal, 8)
@@ -73,8 +78,7 @@ struct PlayerView: View {
                         .background(Color.orange.opacity(0.1))
                         .clipShape(Capsule())
                 } else if player.isPlaying {
-                    // NEU: Grünes Live-Symbol bei stabiler Verbindung
-                    Label("Live • Verbunden", systemImage: "antenna.radiowaves.left.and.right")
+                    Label("Live", systemImage: "antenna.radiowaves.left.and.right")
                         .font(.caption)
                         .foregroundStyle(.green)
                         .padding(.horizontal, 8)
@@ -84,7 +88,7 @@ struct PlayerView: View {
                 }
 
                 if metadata.isLive {
-                    Text("Live Übertragung")
+                    Text(tr("Live Broadcast", "Live Übertragung", lang))
                         .font(.caption)
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .background(.red.opacity(0.2))
@@ -92,46 +96,116 @@ struct PlayerView: View {
                         .clipShape(Capsule())
                 }
 
-                Text(metadata.currentTrack?.title ?? "Titel unbekannt")
+                Text(metadata.currentTrack?.title ?? tr("Unknown Title", "Titel unbekannt", lang))
                     .font(.title2).bold().multilineTextAlignment(.center).lineLimit(2)
                     .padding(.horizontal, 20)
 
-                Text(metadata.currentTrack?.artist ?? "Künstler unbekannt")
+                Text(metadata.currentTrack?.artist ?? tr("Unknown Artist", "Künstler unbekannt", lang))
                     .font(.title3).foregroundStyle(.secondary).multilineTextAlignment(.center).lineLimit(1)
                     .padding(.horizontal, 20)
             }
 
             Spacer()
 
-            // Controls
-            HStack(spacing: 60) {
-                Button {
-                    player.togglePlayPause()
-                } label: {
-                    ZStack {
-                        Circle().fill(accentBlue).frame(width: 75, height: 75)
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.white)
-                    }
-                    .shadow(color: accentBlue.opacity(0.4), radius: 10, y: 5)
+            // FIXED BOTTOM — niemals verschoben
+            Button {
+                player.togglePlayPause()
+            } label: {
+                ZStack {
+                    Circle().fill(accentColor).frame(width: 75, height: 75)
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.white)
                 }
+                .shadow(color: accentColor.opacity(0.4), radius: 10, y: 5)
+            }
+            .padding(.bottom, 32)
+
+            // AirPlay | Sleep Timer | Stop
+            HStack {
+                ZStack {
+                    Circle()
+                        .fill(player.isAirPlayActive
+                              ? accentColor.opacity(0.2)
+                              : Color.gray.opacity(colorScheme == .dark ? 0.3 : 0.15))
+                        .frame(width: 50, height: 50)
+                    AirPlayButton(tintColor: UIColor(accentColor), activeTintColor: UIColor(accentColor))
+                        .frame(width: 28, height: 28)
+                }
+
+                Spacer()
+
+                sleepTimerButton
+
+                Spacer()
 
                 Button {
                     player.stop()
                     dismiss()
                 } label: {
                     ZStack {
-                        Circle().fill(Color.gray.opacity(colorScheme == .dark ? 0.3 : 0.15)).frame(width: 50, height: 50)
+                        Circle()
+                            .fill(Color.gray.opacity(colorScheme == .dark ? 0.3 : 0.15))
+                            .frame(width: 50, height: 50)
                         Image(systemName: "stop.fill")
-                            .font(.system(size: 20)).foregroundStyle(.primary)
+                            .font(.system(size: 20))
+                            .foregroundStyle(accentColor)
                     }
                 }
             }
+            .padding(.horizontal, 60)
             .padding(.bottom, 50)
         }
         .background(Color(UIColor.systemBackground))
         .ignoresSafeArea()
+        .onAppear { player.updateAirPlayState() }
+        .confirmationDialog(
+            tr("Sleep Timer", "Sleep Timer", lang),
+            isPresented: $showSleepTimerDialog,
+            titleVisibility: .visible
+        ) {
+            if player.sleepTimerEnd != nil {
+                Button(tr("Cancel Timer", "Timer abbrechen", lang), role: .destructive) {
+                    player.cancelSleepTimer()
+                }
+            }
+            Button("15 \(tr("min", "Min", lang))") { player.setSleepTimer(minutes: 15) }
+            Button("30 \(tr("min", "Min", lang))") { player.setSleepTimer(minutes: 30) }
+            Button("45 \(tr("min", "Min", lang))") { player.setSleepTimer(minutes: 45) }
+            Button("1 \(tr("hour", "Std", lang))") { player.setSleepTimer(minutes: 60) }
+            Button("90 \(tr("min", "Min", lang))") { player.setSleepTimer(minutes: 90) }
+            Button("2 \(tr("hours", "Std", lang))") { player.setSleepTimer(minutes: 120) }
+            Button(tr("Cancel", "Abbrechen", lang), role: .cancel) {}
+        }
+    }
+
+    @ViewBuilder
+    private var sleepTimerButton: some View {
+        Button {
+            showSleepTimerDialog = true
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(player.sleepTimerEnd != nil
+                          ? accentColor.opacity(0.15)
+                          : Color.gray.opacity(colorScheme == .dark ? 0.3 : 0.15))
+                    .frame(width: 50, height: 50)
+                if let end = player.sleepTimerEnd {
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        let remaining = max(0, Int(end.timeIntervalSinceNow))
+                        let mins = remaining / 60
+                        let secs = remaining % 60
+                        Text(String(format: "%d:%02d", mins, secs))
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(accentColor)
+                    }
+                } else {
+                    Image(systemName: "moon.zzz.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(accentColor)
+                }
+            }
+        }
     }
 
     private var placeholder: some View {
@@ -140,5 +214,23 @@ struct PlayerView: View {
             Image(systemName: "music.note.house")
                 .font(.system(size: 80)).foregroundStyle(.gray.opacity(0.5))
         }
+    }
+}
+
+struct AirPlayButton: UIViewRepresentable {
+    var tintColor: UIColor = .label
+    var activeTintColor: UIColor = .systemBlue
+
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let picker = AVRoutePickerView()
+        picker.tintColor = tintColor
+        picker.activeTintColor = activeTintColor
+        picker.backgroundColor = .clear
+        return picker
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
+        uiView.tintColor = tintColor
+        uiView.activeTintColor = activeTintColor
     }
 }

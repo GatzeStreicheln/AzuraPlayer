@@ -19,6 +19,12 @@ class MetadataService: ObservableObject {
 
         stopPolling()
         currentAPIURL = apiURL
+
+        currentTrack = nil
+        stationName = nil
+        stationArtURL = nil
+        isLive = false
+        isOnline = false
         isConnecting = true
 
         Task { await fetchNowPlaying() }
@@ -41,16 +47,18 @@ class MetadataService: ObservableObject {
               let url = URL(string: urlString) else { return }
 
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            let (data, _) = try await URLSession.shared.data(for: request)
             let response = try JSONDecoder().decode(NowPlayingResponse.self, from: data)
 
             stationName = response.station.name
-            isOnline = response.isOnline
+            isOnline = response.isOnline ?? true
             isLive = response.live?.isLive ?? false
             isConnecting = false
 
-            let shortcode = response.station.shortcode
-            if let components = URLComponents(url: url, resolvingAgainstBaseURL: true),
+            if let shortcode = response.station.shortcode,
+               let components = URLComponents(url: url, resolvingAgainstBaseURL: true),
                let scheme = components.scheme,
                let host = components.host {
                 let newArtURL = "\(scheme)://\(host)/api/station/\(shortcode)/art"

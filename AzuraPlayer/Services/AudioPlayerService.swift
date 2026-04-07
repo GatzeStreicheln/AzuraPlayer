@@ -9,10 +9,14 @@ class AudioPlayerService: ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var isBuffering: Bool = false
     @Published var currentStation: RadioStation?
+    @Published var sleepTimerEnd: Date? = nil
+    @Published var isAirPlayActive: Bool = false
 
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
     private var statusObserver: NSKeyValueObservation?
+    private var timeControlObserver: NSKeyValueObservation?
+    private var sleepCountdownTimer: Timer?
     private var reconnectTimer: Timer?
     private var reconnectAttempts = 0
     private var metadataTimer: Timer?
@@ -23,6 +27,34 @@ class AudioPlayerService: ObservableObject {
     private init() {
         setupAudioSession()
         setupRemoteControls()
+        setupRouteObserver()
+    }
+
+    private func setupRouteObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(audioRouteChanged),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+        updateAirPlayState()
+    }
+
+    @objc private func audioRouteChanged(_ notification: Notification) {
+        updateAirPlayState()
+    }
+
+    func updateAirPlayState() {
+        let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+        let active = outputs.contains {
+            $0.portType == .airPlay ||
+            $0.portType == .bluetoothA2DP ||
+            $0.portType == .bluetoothLE ||
+            $0.portType == .bluetoothHFP
+        }
+        DispatchQueue.main.async {
+            self.isAirPlayActive = active
+        }
     }
 
     private func setupAudioSession() {
@@ -33,9 +65,7 @@ class AudioPlayerService: ObservableObject {
                 options: [.allowAirPlay, .allowBluetoothHFP]
             )
             try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            print("Audio session error: \(error)")
-        }
+        } catch {}
     }
 
     func play(station: RadioStation) {
@@ -55,25 +85,43 @@ class AudioPlayerService: ObservableObject {
         isBuffering = true
 
         player?.pause()
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
+        NotificationCenter.default.removeObserver(self, name: AVPlayerItem.playbackStalledNotification, object: playerItem)
         player = nil
         playerItem = nil
         statusObserver?.invalidate()
-        NotificationCenter.default.removeObserver(self)
+        timeControlObserver?.invalidate()
 
         setPlaceholderNowPlayingInfo(for: station)
 
         playerItem = AVPlayerItem(url: url)
+        playerItem?.preferredForwardBufferDuration = 5
         player = AVPlayer(playerItem: playerItem)
+        player?.allowsExternalPlayback = false
+        player?.automaticallyWaitsToMinimizeStalling = true
 
         statusObserver = playerItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
             DispatchQueue.main.async {
-                switch item.status {
-                case .readyToPlay:
-                    self?.isBuffering = false
-                case .failed:
-                    self?.isBuffering = false
+                if item.status == .readyToPlay {
+                    self?.player?.play()
+                } else if item.status == .failed {
                     self?.scheduleReconnect()
-                default:
+                }
+            }
+        }
+
+        timeControlObserver = player?.observe(\.timeControlStatus, options: [.new]) { [weak self] avPlayer, _ in
+            DispatchQueue.main.async {
+                guard self?.isPlaying == true else { return }
+                switch avPlayer.timeControlStatus {
+                case .playing:
+                    self?.isBuffering = false
+                    self?.playerItem?.preferredForwardBufferDuration = 0
+                case .waitingToPlayAtSpecifiedRate:
+                    self?.isBuffering = true
+                case .paused:
+                    break
+                @unknown default:
                     break
                 }
             }
@@ -86,7 +134,13 @@ class AudioPlayerService: ObservableObject {
             object: playerItem
         )
 
-        player?.play()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playbackStalled),
+            name: AVPlayerItem.playbackStalledNotification,
+            object: playerItem
+        )
+
         isPlaying = true
 
         DispatchQueue.main.async {
@@ -119,22 +173,20 @@ class AudioPlayerService: ObservableObject {
         }
     }
 
-    // MARK: - Pause / Resume
-
     func pause() {
-        // Player zerstören → kein Buffering im Hintergrund
         player?.pause()
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
+        NotificationCenter.default.removeObserver(self, name: AVPlayerItem.playbackStalledNotification, object: playerItem)
         player = nil
         playerItem = nil
         statusObserver?.invalidate()
         statusObserver = nil
-        NotificationCenter.default.removeObserver(self)
+        timeControlObserver?.invalidate()
+        timeControlObserver = nil
 
         isPlaying = false
         isBuffering = false
-        // Metadata-Polling läuft weiter → Song wechselt auch im Pause-Zustand
 
-        // playbackRate = 0 → iOS zeigt Play-Symbol (kein Quadrat)
         DispatchQueue.main.async {
             var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
             info[MPNowPlayingInfoPropertyPlaybackRate] = 0.0
@@ -143,7 +195,6 @@ class AudioPlayerService: ObservableObject {
     }
 
     func resume() {
-        // Immer neu verbinden → Stream ist live
         guard let station = currentStation else { return }
         play(station: station)
     }
@@ -154,13 +205,33 @@ class AudioPlayerService: ObservableObject {
         playerItem = nil
         statusObserver?.invalidate()
         statusObserver = nil
+        timeControlObserver?.invalidate()
+        timeControlObserver = nil
         isPlaying = false
         isBuffering = false
         stopMetadataTimer()
         stopReconnectTimer()
+        cancelSleepTimer()
         MetadataService.shared.stopPolling()
         currentStation = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
+    func setSleepTimer(minutes: Int) {
+        sleepCountdownTimer?.invalidate()
+        sleepTimerEnd = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        sleepCountdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self, let end = self.sleepTimerEnd else { return }
+            DispatchQueue.main.async {
+                if Date() >= end { self.stop() }
+            }
+        }
+    }
+
+    func cancelSleepTimer() {
+        sleepCountdownTimer?.invalidate()
+        sleepCountdownTimer = nil
+        sleepTimerEnd = nil
     }
 
     func togglePlayPause() {
@@ -170,8 +241,6 @@ class AudioPlayerService: ObservableObject {
             resume()
         }
     }
-
-    // MARK: - Metadata Timer
 
     private func startMetadataTimer() {
         metadataTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
@@ -184,10 +253,13 @@ class AudioPlayerService: ObservableObject {
         metadataTimer = nil
     }
 
-    // MARK: - Reconnect
-
     @objc private func playerItemFailedToPlay() {
+        DispatchQueue.main.async { self.isBuffering = true }
         scheduleReconnect()
+    }
+
+    @objc private func playbackStalled() {
+        DispatchQueue.main.async { self.isBuffering = true }
     }
 
     private func scheduleReconnect() {
@@ -204,8 +276,6 @@ class AudioPlayerService: ObservableObject {
         reconnectTimer?.invalidate()
         reconnectTimer = nil
     }
-
-    // MARK: - Remote Controls
 
     private func setupRemoteControls() {
         let commandCenter = MPRemoteCommandCenter.shared()
@@ -230,8 +300,6 @@ class AudioPlayerService: ObservableObject {
             return .success
         }
     }
-
-    // MARK: - Now Playing Info
 
     func updateNowPlayingInfo() {
         var info = [String: Any]()

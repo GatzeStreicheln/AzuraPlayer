@@ -1,58 +1,16 @@
 import Foundation
 import SwiftUI
 import Combine
-import WatchConnectivity
 
-class StationStore: NSObject, ObservableObject, WCSessionDelegate {
+class StationStore: ObservableObject {
     @Published var stations: [RadioStation] = []
 
     private let saveKey = "saved_stations"
 
-    override init() {
-        super.init()
-        if WCSession.isSupported() {
-            WCSession.default.delegate = self
-            WCSession.default.activate()
-        }
+    init() {
         load()
         stations.forEach { fetchStationName(for: $0) }
     }
-
-    // MARK: - WCSessionDelegate
-
-    func session(_ session: WCSession,
-                 activationDidCompleteWith activationState: WCSessionActivationState,
-                 error: Error?) {
-        sendToWatch()
-    }
-
-    func sessionDidBecomeInactive(_ session: WCSession) {}
-    func sessionDidDeactivate(_ session: WCSession) {
-        WCSession.default.activate()
-    }
-
-    // MARK: - Watch Sync
-
-    func sendToWatch() {
-        guard WCSession.default.activationState == .activated else { return }
-        // Thumbnail (60×60, JPEG 0.4) statt Originalbild – bleibt unter dem 65 KB-Limit
-        let lite = stations.map { s -> RadioStation in
-            var copy = s
-            if let data = s.customImageData, let image = UIImage(data: data) {
-                let size = CGSize(width: 60, height: 60)
-                let renderer = UIGraphicsImageRenderer(size: size)
-                let thumb = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
-                copy.customImageData = thumb.jpegData(compressionQuality: 0.4)
-            } else {
-                copy.customImageData = nil
-            }
-            return copy
-        }
-        guard let data = try? JSONEncoder().encode(lite) else { return }
-        try? WCSession.default.updateApplicationContext(["stations": data])
-    }
-
-    // MARK: - CRUD
 
     func add(station: RadioStation) {
         var s = station
@@ -60,15 +18,33 @@ class StationStore: NSObject, ObservableObject, WCSessionDelegate {
         stations.append(s)
         save()
         fetchStationName(for: s)
-        sendToWatch()
     }
 
     func update(station: RadioStation) {
         if let idx = stations.firstIndex(where: { $0.id == station.id }) {
-            stations[idx] = station
+            let old = stations[idx]
+            var updated = station
+
+            if old.apiURL != station.apiURL || old.streamURL != station.streamURL {
+                updated.fetchedStationName = nil
+            }
+
+            stations[idx] = updated
             save()
-            fetchStationName(for: station)
-            sendToWatch()
+            fetchStationName(for: updated)
+
+            let player = AudioPlayerService.shared
+            guard player.currentStation?.id == updated.id else { return }
+
+            if old.streamURL != updated.streamURL {
+                player.play(station: updated)
+            } else if old.apiURL != updated.apiURL {
+                player.currentStation = updated
+                MetadataService.shared.stopPolling()
+                MetadataService.shared.startPolling(apiURL: updated.apiURL)
+            } else {
+                player.currentStation = updated
+            }
         }
     }
 
@@ -76,17 +52,13 @@ class StationStore: NSObject, ObservableObject, WCSessionDelegate {
         stations.removeAll { $0.id == station.id }
         for i in stations.indices { stations[i].sortOrder = i }
         save()
-        sendToWatch()
     }
 
     func move(from: IndexSet, to: Int) {
         stations.move(fromOffsets: from, toOffset: to)
         for i in stations.indices { stations[i].sortOrder = i }
         save()
-        sendToWatch()
     }
-
-    // MARK: - Fetch / Save / Load
 
     func fetchStationName(for station: RadioStation) {
         guard !station.apiURL.isEmpty,
@@ -99,13 +71,10 @@ class StationStore: NSObject, ObservableObject, WCSessionDelegate {
                 await MainActor.run {
                     if let idx = self.stations.firstIndex(where: { $0.id == station.id }) {
                         self.stations[idx].fetchedStationName = response.station.name
-                        self.save()        // Name in UserDefaults persistieren
-                        self.sendToWatch() // Watch mit aktuellem Namen versorgen
+                        self.save()
                     }
                 }
-            } catch {
-                print("fetchStationName error: \(error)")
-            }
+            } catch {}
         }
     }
 
@@ -122,4 +91,3 @@ class StationStore: NSObject, ObservableObject, WCSessionDelegate {
         }
     }
 }
-

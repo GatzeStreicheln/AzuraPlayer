@@ -3,11 +3,12 @@ import SwiftUI
 struct PlayerBarView: View {
     @ObservedObject var player = AudioPlayerService.shared
     @ObservedObject var metadata = MetadataService.shared
-    private let accentBlue = Color(red: 0.0, green: 0.48, blue: 1.0)
+    @AppStorage("appLanguage") private var lang = "en"
+    @AppStorage("themeColor") private var themeColorName = "blue"
+    private var accentColor: Color { AppTheme.color(for: themeColorName) }
 
     var body: some View {
         HStack(spacing: 14) {
-            // Cover
             ZStack {
                 if let station = player.currentStation,
                    station.showSongArt,
@@ -34,24 +35,22 @@ struct PlayerBarView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
 
-            // Infos
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     if player.isBuffering {
-                        Text("Verbinde...")
+                        Text(tr("Connecting...", "Verbinde...", lang))
                             .font(.subheadline).bold()
                             .foregroundStyle(.orange)
                     } else if player.isPlaying {
-                        // Kleines grünes Punkt-Icon für "Verbunden"
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .font(.caption2)
                             .foregroundStyle(.green)
-                        Text(metadata.currentTrack?.title ?? "Live Stream")
+                        Text(metadata.currentTrack?.title ?? tr("Live Stream", "Live Stream", lang))
                             .font(.subheadline).bold()
                             .foregroundStyle(.primary)
                             .lineLimit(1)
                     } else {
-                        Text(metadata.currentTrack?.title ?? "Pausiert")
+                        Text(metadata.currentTrack?.title ?? tr("Paused", "Pausiert", lang))
                             .font(.subheadline).bold()
                             .foregroundStyle(.primary)
                             .lineLimit(1)
@@ -66,7 +65,6 @@ struct PlayerBarView: View {
 
             Spacer()
 
-            // Play/Pause
             Button {
                 player.togglePlayPause()
             } label: {
@@ -74,17 +72,16 @@ struct PlayerBarView: View {
                     .font(.title3)
                     .foregroundStyle(.white)
                     .frame(width: 36, height: 36)
-                    .background(accentBlue)
+                    .background(accentColor)
                     .clipShape(Circle())
             }
 
-            // Stop
             Button {
                 player.stop()
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(accentColor)
                     .frame(width: 36, height: 36)
             }
         }

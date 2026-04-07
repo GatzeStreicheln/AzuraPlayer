@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 struct RadioStation: Identifiable, Codable {
     var id: UUID = UUID()
@@ -8,6 +7,7 @@ struct RadioStation: Identifiable, Codable {
     var apiURL: String
     var customImageData: Data?
     var showSongArt: Bool = false
+    var autoFillAPI: Bool = false
     var sortOrder: Int = 0
 
     var fetchedStationName: String?
@@ -18,12 +18,4 @@ struct RadioStation: Identifiable, Codable {
         if let fetched = fetchedStationName, !fetched.isEmpty { return fetched }
         return streamURL
     }
-
-    enum CodingKeys: String, CodingKey {
-        case id, customName, streamURL, apiURL
-        case customImageData, showSongArt, sortOrder
-        case fetchedStationName, fetchedStationArtURL
-    }
 }
-
-

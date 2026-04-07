@@ -7,12 +7,13 @@ struct ContentView: View {
     @State private var selectedTab = 0
     @State private var showPlayer = false
     @AppStorage("isDarkModeEnabled") private var isDarkModeEnabled = false
+    @AppStorage("themeColor") private var themeColorName = "blue"
 
-    private let accentBlue = Color(red: 0.0, green: 0.48, blue: 1.0)
+    private var accentColor: Color { AppTheme.color(for: themeColorName) }
 
     var body: some View {
         ZStack {
-            Color(UIColor.systemBackground)
+            Color(UIColor.systemGroupedBackground)
                 .ignoresSafeArea()
 
             TabView(selection: $selectedTab) {
@@ -24,7 +25,7 @@ struct ContentView: View {
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                     .tag(1)
             }
-            .tint(accentBlue)
+            .tint(accentColor)
             .preferredColorScheme(isDarkModeEnabled ? .dark : .light)
 
             if player.currentStation != nil {
@@ -48,6 +49,7 @@ struct ContentView: View {
                 .presentationDetents([.large])
                 .presentationBackgroundInteraction(.enabled)
                 .presentationCornerRadius(24)
+                .tint(accentColor)
                 .id(showPlayer)
         }
     }

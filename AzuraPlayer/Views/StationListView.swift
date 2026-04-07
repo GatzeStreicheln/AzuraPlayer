@@ -3,7 +3,10 @@ import SwiftUI
 struct StationListView: View {
     @EnvironmentObject var store: StationStore
     @EnvironmentObject var player: AudioPlayerService
+    @AppStorage("appLanguage") private var lang = "en"
+    @AppStorage("themeColor") private var themeColorName = "blue"
 
+    @State private var isReordering = false
     @State private var showAddStation = false
     @State private var editingStation: RadioStation? = nil
     @State private var stationToDelete: RadioStation? = nil
@@ -19,23 +22,27 @@ struct StationListView: View {
                     )
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        guard !isReordering else { return }
                         player.play(station: station)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            stationToDelete = station
-                        } label: {
-                            Label("Löschen", systemImage: "trash")
-                        }
-                        .tint(.red)
+                        if !isReordering {
+                            Button(role: .destructive) {
+                                stationToDelete = station
+                            } label: {
+                                Label(tr("Delete", "Löschen", lang), systemImage: "trash")
+                            }
+                            .tint(.red)
 
-                        Button {
-                            editingStation = station
-                        } label: {
-                            Label("Bearbeiten", systemImage: "pencil")
+                            Button {
+                                editingStation = station
+                            } label: {
+                                Label(tr("Edit", "Bearbeiten", lang), systemImage: "pencil")
+                            }
+                            .tint(AppTheme.color(for: themeColorName))
                         }
-                        .tint(.accentColor)
                     }
+                    .deleteDisabled(true)
                     .listRowBackground(Color.clear)
                 }
                 .onMove { from, to in
@@ -49,41 +56,60 @@ struct StationListView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .background(Color(UIColor.systemBackground).ignoresSafeArea())
-            .navigationTitle("AzuraPlayer")
+            .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+            .environment(\.editMode, .constant(isReordering ? .active : .inactive))
+            .navigationTitle(tr("Stations", "Sender", lang))
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    EditButton()
+                    if isReordering {
+                        Button {
+                            withAnimation { isReordering = false }
+                        } label: {
+                            Image(systemName: "checkmark")
+                        }
+                    } else {
+                        Button {
+                            withAnimation { isReordering = true }
+                        } label: {
+                            Text(tr("Edit", "Bearbeiten", lang))
+                        }
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showAddStation = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 20, weight: .semibold))
+                    if !isReordering {
+                        Button {
+                            showAddStation = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .semibold))
+                        }
                     }
                 }
             }
             .alert(
-                "Sender löschen?",
+                tr("Delete Station?", "Sender löschen?", lang),
                 isPresented: Binding(
                     get: { stationToDelete != nil },
                     set: { if !$0 { stationToDelete = nil } }
                 ),
                 presenting: stationToDelete
             ) { station in
-                Button("Löschen", role: .destructive) {
+                Button(tr("Delete", "Löschen", lang), role: .destructive) {
                     store.delete(station: station)
                     if player.currentStation?.id == station.id {
                         player.stop()
                     }
                     stationToDelete = nil
                 }
-                Button("Abbrechen", role: .cancel) {
+                Button(tr("Cancel", "Abbrechen", lang), role: .cancel) {
                     stationToDelete = nil
                 }
             } message: { station in
-                Text("Möchten Sie '\(station.displayName)' wirklich entfernen?")
+                Text(tr(
+                    "Do you really want to remove '\(station.displayName)'?",
+                    "Möchten Sie '\(station.displayName)' wirklich entfernen?",
+                    lang
+                ))
             }
             .sheet(isPresented: $showAddStation) {
                 AddEditStationView(store: store)
@@ -94,4 +120,3 @@ struct StationListView: View {
         }
     }
 }
-

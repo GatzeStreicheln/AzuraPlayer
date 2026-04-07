@@ -3,8 +3,8 @@ import Foundation
 struct NowPlayingResponse: Codable {
     let station: StationInfo
     let nowPlaying: NowPlayingTrack?
-    let live: LiveInfo?  // <--- WICHTIG: Optional (kann fehlen)
-    let isOnline: Bool
+    let live: LiveInfo?
+    let isOnline: Bool?
 
     enum CodingKeys: String, CodingKey {
         case station
@@ -16,7 +16,7 @@ struct NowPlayingResponse: Codable {
 
 struct StationInfo: Codable {
     let name: String
-    let shortcode: String
+    let shortcode: String?
     let listenURL: String?
 
     enum CodingKeys: String, CodingKey {

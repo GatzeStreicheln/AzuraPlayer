@@ -5,6 +5,9 @@ struct StationRowView: View {
     let isPlaying: Bool
     let isBuffering: Bool
 
+    @AppStorage("themeColor") private var themeColorName = "blue"
+    private var accentColor: Color { AppTheme.color(for: themeColorName) }
+
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
@@ -21,7 +24,7 @@ struct StationRowView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(isPlaying ? Color.accentColor : Color.clear, lineWidth: 2)
+                    .stroke(isPlaying ? accentColor : Color.clear, lineWidth: 2)
             )
 
             VStack(alignment: .leading, spacing: 4) {
@@ -33,7 +36,6 @@ struct StationRowView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
     }
 
     private var placeholderIcon: some View {
