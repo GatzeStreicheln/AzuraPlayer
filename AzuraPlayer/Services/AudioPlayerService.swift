@@ -11,6 +11,7 @@ class AudioPlayerService: ObservableObject {
     @Published var currentStation: RadioStation?
     @Published var sleepTimerEnd: Date? = nil
     @Published var isAirPlayActive: Bool = false
+    @Published var currentBitrate: Int? = nil
 
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
@@ -117,6 +118,7 @@ class AudioPlayerService: ObservableObject {
                 case .playing:
                     self?.isBuffering = false
                     self?.playerItem?.preferredForwardBufferDuration = 0
+                    self?.updateBitrate()
                 case .waitingToPlayAtSpecifiedRate:
                     self?.isBuffering = true
                 case .paused:
@@ -186,6 +188,7 @@ class AudioPlayerService: ObservableObject {
 
         isPlaying = false
         isBuffering = false
+        currentBitrate = nil
 
         DispatchQueue.main.async {
             var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
@@ -251,6 +254,22 @@ class AudioPlayerService: ObservableObject {
     private func stopMetadataTimer() {
         metadataTimer?.invalidate()
         metadataTimer = nil
+    }
+
+    private func updateBitrate() {
+        if let events = playerItem?.accessLog()?.events,
+           let last = events.last,
+           last.indicatedBitrate > 0 {
+            currentBitrate = Int(last.indicatedBitrate / 1000)
+            return
+        }
+        guard let item = playerItem else { return }
+        Task {
+            guard let track = try? await item.asset.loadTracks(withMediaType: .audio).first,
+                  let rate = try? await track.load(.estimatedDataRate),
+                  rate > 0 else { return }
+            await MainActor.run { self.currentBitrate = Int(rate / 1000) }
+        }
     }
 
     @objc private func playerItemFailedToPlay() {

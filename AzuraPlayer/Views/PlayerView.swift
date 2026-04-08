@@ -15,7 +15,6 @@ struct PlayerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // FIXED TOP — niemals verschoben
             VStack(spacing: 15) {
                 Capsule()
                     .fill(Color.gray.opacity(0.4))
@@ -35,7 +34,6 @@ struct PlayerView: View {
             .padding(.top, 10)
             .padding(.bottom, 8)
 
-            // FLEXIBLER BEREICH — nur Cover + Metadata verschieben sich
             Spacer()
 
             ZStack {
@@ -78,7 +76,8 @@ struct PlayerView: View {
                         .background(Color.orange.opacity(0.1))
                         .clipShape(Capsule())
                 } else if player.isPlaying {
-                    Label(tr("Live", "Live", lang), systemImage: "antenna.radiowaves.left.and.right")
+                    let bitrateLabel = player.currentBitrate.map { " · \($0) kbps" } ?? ""
+                    Label("Live\(bitrateLabel)", systemImage: "antenna.radiowaves.left.and.right")
                         .font(.caption)
                         .foregroundStyle(.green)
                         .padding(.horizontal, 8)
@@ -107,7 +106,6 @@ struct PlayerView: View {
 
             Spacer()
 
-            // FIXED BOTTOM — niemals verschoben
             Button {
                 player.togglePlayPause()
             } label: {

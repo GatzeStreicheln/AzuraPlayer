@@ -10,11 +10,23 @@ struct AddEditStationView: View {
 
     @State private var customName: String = ""
     @State private var streamURL: String = ""
+    @State private var urlScheme: String = "https"
     @State private var apiURL: String = ""
     @State private var showSongArt: Bool = false
     @State private var autoFillAPI: Bool = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var customImageData: Data?
+
+    private var urlPathBinding: Binding<String> {
+        Binding(
+            get: {
+                if streamURL.hasPrefix("https://") { return String(streamURL.dropFirst(8)) }
+                if streamURL.hasPrefix("http://") { return String(streamURL.dropFirst(7)) }
+                return streamURL
+            },
+            set: { streamURL = "\(urlScheme)://\($0)" }
+        )
+    }
 
     var isEditing: Bool { editStation != nil }
 
@@ -25,15 +37,39 @@ struct AddEditStationView: View {
                     TextField(tr("Name (optional – uses station name)", "Name (optional – sonst Sendername)", lang), text: $customName)
                         .autocorrectionDisabled()
 
-                    TextField("Stream-URL", text: $streamURL)
-                        .keyboardType(.URL)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .onChange(of: streamURL) { _, newValue in
-                            if autoFillAPI, let derived = derivedAPIURL(from: newValue) {
-                                apiURL = derived
+                    HStack(spacing: 8) {
+                        Menu {
+                            Button("https") { urlScheme = "https" }
+                            Button("http")  { urlScheme = "http"  }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Spacer(minLength: 0)
+                                Text(urlScheme)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.primary)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Spacer(minLength: 0)
                             }
+                            .frame(width: 72, height: 34)
+                            .contentShape(Rectangle())
                         }
+                        .background(Color(.tertiarySystemFill))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .onChange(of: urlScheme) { _, newScheme in
+                            streamURL = "\(newScheme)://\(urlPathBinding.wrappedValue)"
+                        }
+                        TextField(tr("your-domain.com/hls/…", "ihre-domain.com/hls/…", lang), text: urlPathBinding)
+                            .keyboardType(.URL)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                    .onChange(of: streamURL) { _, newValue in
+                        if autoFillAPI, let derived = derivedAPIURL(from: newValue) {
+                            apiURL = derived
+                        }
+                    }
 
                     TextField("API-URL (Now Playing)", text: $apiURL)
                         .keyboardType(.URL)
@@ -88,7 +124,11 @@ struct AddEditStationView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("💡 AzuraCast API-Format:")
                             .font(.caption).bold()
-                        Text("https://your-domain.com/api/nowplaying/station_shortcode")
+                        Text(verbatim: "https://your-domain.com/api/nowplaying/station_shortcode")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.disabled)
+                        Text(tr("Supported formats: HLS, MP3, AAC", "Unterstützte Formate: HLS, MP3, AAC", lang))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -127,21 +167,28 @@ struct AddEditStationView: View {
 
     // Derives the AzuraCast API URL from a stream URL.
     // Example: https://radio.example.com/listen/music → https://radio.example.com/api/nowplaying/music
+    // Example: https://radio.example.com/hls/music/live.m3u8 → https://radio.example.com/api/nowplaying/music
     private func derivedAPIURL(from streamURL: String) -> String? {
         guard let url = URL(string: streamURL),
               let scheme = url.scheme,
               let host = url.host else { return nil }
         let components = url.pathComponents.filter { $0 != "/" }
-        guard let listenIdx = components.firstIndex(of: "listen"),
-              listenIdx + 1 < components.count else { return nil }
-        let stationName = components[listenIdx + 1]
-        return "\(scheme)://\(host)/api/nowplaying/\(stationName)"
+        if let listenIdx = components.firstIndex(of: "listen"), listenIdx + 1 < components.count {
+            let stationName = components[listenIdx + 1]
+            return "\(scheme)://\(host)/api/nowplaying/\(stationName)"
+        }
+        if let hlsIdx = components.firstIndex(of: "hls"), hlsIdx + 1 < components.count {
+            let stationName = components[hlsIdx + 1]
+            return "\(scheme)://\(host)/api/nowplaying/\(stationName)"
+        }
+        return nil
     }
 
     private func prefill() {
         guard let s = editStation else { return }
         customName = s.customName ?? ""
         streamURL = s.streamURL
+        urlScheme = s.streamURL.hasPrefix("http://") ? "http" : "https"
         apiURL = s.apiURL
         showSongArt = s.showSongArt
         autoFillAPI = s.autoFillAPI

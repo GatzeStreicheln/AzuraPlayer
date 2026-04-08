@@ -16,7 +16,6 @@ class PlaybackHistoryStore: ObservableObject {
     func addEntry(song: SongInfo, stationName: String, artworkURL: String?) {
         guard !song.title.isEmpty else { return }
 
-        // Duplikat verhindern: nur speichern wenn sich Titel oder Künstler geändert hat
         if let last = entries.first {
             if last.songTitle == song.title && last.artist == song.artist { return }
         }

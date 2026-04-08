@@ -22,7 +22,6 @@ struct StationListView: View {
                             isBuffering: player.currentStation?.id == station.id && player.isBuffering
                         )
 
-                        // Lösch-Button erscheint nur im Bearbeitungsmodus
                         if isReordering {
                             Button {
                                 stationToDelete = station

@@ -1,9 +1,19 @@
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
+    @EnvironmentObject var store: StationStore
     @AppStorage("isDarkModeEnabled") private var isDarkModeEnabled = false
     @AppStorage("appLanguage") private var lang = "en"
     @AppStorage("themeColor") private var themeColorName = "blue"
+
+    @State private var exportURL: URL?
+    @State private var showImporter = false
+    @State private var pendingImport: [RadioStation]?
+    @State private var showImportConfirm = false
+    @State private var importErrorMessage: String?
+    @State private var showImportError = false
 
     private var accentColor: Color { AppTheme.color(for: themeColorName) }
 
@@ -24,7 +34,7 @@ struct SettingsView: View {
                         Text("English").tag("en")
                         Text("Deutsch").tag("de")
                     }
-                    .id(themeColorName)
+                    .id(lang)
 
                     Picker(tr("Accent Color", "Akzentfarbe", lang), selection: $themeColorName) {
                         ForEach(AppTheme.options, id: \.name) { option in
@@ -38,6 +48,34 @@ struct SettingsView: View {
                         }
                     }
                     .id(themeColorName)
+                }
+
+                Section(tr("Stations", "Sender", lang)) {
+                    Button {
+                        exportStations()
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundStyle(.secondary)
+                            Text(tr("Export Stations", "Sender exportieren", lang))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Text("\(store.stations.count)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Button {
+                        showImporter = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.and.arrow.down")
+                                .foregroundStyle(.secondary)
+                            Text(tr("Import Stations", "Sender importieren", lang))
+                                .foregroundStyle(.primary)
+                        }
+                    }
                 }
 
                 Section(tr("Links & Contact", "Links & Kontakt", lang)) {
@@ -106,7 +144,97 @@ struct SettingsView: View {
             .background(Color(UIColor.systemGroupedBackground))
             .navigationTitle(tr("Settings", "Einstellungen", lang))
             .tint(accentColor)
+            .sheet(item: $exportURL) { url in
+                ShareSheet(url: url)
+            }
+            .fileImporter(
+                isPresented: $showImporter,
+                allowedContentTypes: [.json],
+                allowsMultipleSelection: false
+            ) { result in
+                handleImport(result: result)
+            }
+            .alert(
+                tr("Import Stations?", "Sender importieren?", lang),
+                isPresented: Binding(
+                    get: { pendingImport != nil },
+                    set: { if !$0 { pendingImport = nil } }
+                ),
+                presenting: pendingImport
+            ) { stations in
+                Button(tr("Import", "Importieren", lang)) {
+                    store.importStations(stations)
+                    pendingImport = nil
+                }
+                Button(tr("Cancel", "Abbrechen", lang), role: .cancel) {
+                    pendingImport = nil
+                }
+            } message: { stations in
+                Text(tr(
+                    "Do you really want to import \(stations.count) station(s)?",
+                    "Möchtest du \(stations.count) Sender wirklich importieren?",
+                    lang
+                ))
+            }
+            .alert(tr("Import failed", "Import fehlgeschlagen", lang), isPresented: $showImportError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(importErrorMessage ?? "")
+            }
+        }
+    }
+
+    // MARK: - Export
+
+    private func exportStations() {
+        do {
+            let data = try JSONEncoder().encode(store.stations)
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("AzuraPlayer-Sender")
+                .appendingPathExtension("json")
+            try data.write(to: url)
+            exportURL = url
+        } catch {}
+    }
+
+    // MARK: - Import
+
+    private func handleImport(result: Result<[URL], Error>) {
+        guard case .success(let urls) = result, let url = urls.first else { return }
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: url)
+            let decoded = try JSONDecoder().decode([RadioStation].self, from: data)
+            let existingURLs = Set(store.stations.map { $0.streamURL })
+            let newStations = decoded.filter { !existingURLs.contains($0.streamURL) }
+            if newStations.isEmpty {
+                importErrorMessage = tr(
+                    "All stations already exist in your list.",
+                    "Alle Sender sind bereits in deiner Liste vorhanden.",
+                    lang
+                )
+                showImportError = true
+            } else {
+                pendingImport = newStations
+            }
+        } catch {
+            importErrorMessage = error.localizedDescription
+            showImportError = true
         }
     }
 }
 
+// MARK: - Share Sheet
+
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}

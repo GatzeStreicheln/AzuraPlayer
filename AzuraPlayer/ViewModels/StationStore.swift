@@ -78,6 +78,13 @@ class StationStore: ObservableObject {
         }
     }
 
+    func importStations(_ newStations: [RadioStation]) {
+        stations.append(contentsOf: newStations)
+        for i in stations.indices { stations[i].sortOrder = i }
+        save()
+        newStations.forEach { fetchStationName(for: $0) }
+    }
+
     private func save() {
         if let data = try? JSONEncoder().encode(stations) {
             UserDefaults.standard.set(data, forKey: saveKey)
