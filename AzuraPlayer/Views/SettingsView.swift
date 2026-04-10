@@ -105,7 +105,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    if let url = URL(string: "mailto:vasco@vkugler.ch") {
+                    if let url = URL(string: "mailto:kontakt@vkugler.ch") {
                         Link(destination: url) {
                             HStack {
                                 Image(systemName: "envelope")

@@ -13,3 +13,13 @@ AzuraPlayer is an app for streaming your self-hosted AzuraCast radio stations.
 - Export and import of stations via JSON
 
 This is my first iOS app. I work in IT, but not as a software developer, so I used Claude (AI) as a support tool throughout the development process. I want to be transparent about that.
+
+<table>
+  <tr>
+    <td><img src="Screenshots/homepage.jpg" width="220"/></td>
+    <td><img src="Screenshots/history.jpg" width="220"/></td>
+    <td><img src="Screenshots/player.jpg" width="220"/></td>
+    <td><img src="Screenshots/lockscreen.jpg" width="220"/></td>
+  </tr>
+</table>
+
